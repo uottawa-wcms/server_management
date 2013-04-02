@@ -1,0 +1,6 @@
+name = Server Management
+description = Basic management tool for server information
+core = 7.x
+
+files[] = classes/ServerEntityController.inc
+files[] = classes/ServerConfigurationEntityController.inc

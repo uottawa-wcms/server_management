@@ -1,0 +1,174 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function server_management_schema() {
+  return array(
+    'server_management_servers' => _server_management_schema_servers(),
+    'server_management_config' => _server_management_schema_config(),
+    'server_management_config_types' => _server_management_schema_config_types(),
+  );
+}
+
+/**
+ * Table definition for server_management_config_types
+ */
+function _server_management_schema_config_types() {
+  return array(
+    'fields' => array(
+      'type' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'serialize' => FALSE,
+        'binary' => FALSE,
+      ),
+      'label' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'serialize' => FALSE,
+        'binary' => FALSE,
+      ),
+      'cardinality' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+    ),
+    'primary key' => array(
+      'type',
+    ),
+    'unique keys' => array(),
+    'indexes' => array(),
+  );
+}
+
+/**
+ * Table definition for server_management_config
+ */
+function _server_management_schema_config() {
+  return array(
+    'fields' => array(
+      'cid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'size' => 'normal',
+      ),
+      'label' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'type' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'serialize' => FALSE,
+        'binary' => FALSE,
+      ),
+      'sid' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+      ),
+      'uuid' => array(
+        'type' => 'char',
+        'length' => 64,
+        'not null' => TRUE,
+        'serialize' => FALSE,
+        'binary' => FALSE,
+      ),
+      'inherit' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array(
+      'cid',
+    ),
+    'unique keys' => array(
+      'uuid' => array(
+        'uuid',
+      ),
+    ),
+    'indexes' => array(
+      'type' => array(
+        'type',
+      ),
+      'sid' => array(
+        'sid',
+      ),
+    ),
+  );
+}
+
+/**
+ * Table definition for server_management_servers
+ */
+function _server_management_schema_servers() {
+  return array(
+    'fields' => array(
+      'sid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'size' => 'normal',
+      ),
+      'label' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'serialize' => FALSE,
+        'binary' => FALSE,
+      ),
+      'status' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'access_key' => array(
+        'type' => 'char',
+        'length' => 64,
+        'not null' => TRUE,
+        'serialize' => FALSE,
+        'binary' => FALSE,
+      ),
+      'parent_sid' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'unsigned' => FALSE,
+        'not null' => FALSE,
+        'default' => 0,
+      ),
+      'machine_name' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'serialize' => FALSE,
+        'binary' => FALSE,
+      ),
+    ),
+    'primary key' => array(
+      'sid',
+    ),
+    'unique keys' => array(
+      'machine_name' => array(
+        'machine_name',
+      ),
+    ),
+    'indexes' => array(
+      'parent_sid' => array(
+        'parent_sid',
+      ),
+    ),
+  );
+}

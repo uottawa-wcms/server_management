@@ -1,0 +1,105 @@
+<?php
+
+function server_management_admin_ui_menu_alter(&$menu) {
+  if (empty($menu['admin/data'])) {
+    $menu['admin/data'] = array(
+      'title' => 'Data',
+      'description' => 'Manage non-content data',
+      'weight' => '-9',
+      'position' => 'right',
+      'page callback' => 'system_admin_menu_block_page',
+      'module' => 'system',
+      'file' => 'system.admin.inc',
+      'access arguments' => array('access administration pages'),
+    );
+  }
+}
+
+function server_management_admin_ui_menu() {
+  $menu = array();
+  $common = array(
+    'file' => 'server_management_admin_ui.admin.inc',
+    'access arguments' => array('administer servers'),
+  );
+  $menu['admin/data/servers'] = array(
+    'title' => 'Managed Servers',
+    'description' => 'Manage server configurations',
+    'page callback' => 'server_management_admin_ui_server_list',
+  ) + $common;
+  $menu['admin/data/servers/add'] = array(
+    'title' => 'Add Managed Server',
+    'description' => 'Create a new managed server',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_admin_ui_edit_form', NULL),
+    'type' => MENU_LOCAL_ACTION,
+  ) + $common;
+  $menu['admin/data/servers/%server_management'] = array(
+    'title' => 'Managed Server Information',
+    'description' => 'View a managed server',
+    'page callback' => 'server_management_admin_ui_view',
+    'page arguments' => array(3),
+  ) + $common;
+  $menu['admin/data/servers/%server_management/view'] = array(
+    'title' => 'View',
+    'type' => MENU_LOCAL_TASK & MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  ) + $common;
+  $menu['admin/data/servers/%server_management/edit'] = array(
+    'title' => 'Edit',
+    'description' => 'Edit a managed server',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_admin_ui_edit_form', 3),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 0,
+  ) + $common;
+  $menu['admin/data/servers/%server_management/config'] = array(
+    'title' => 'Packets',
+    'page callback' => 'server_management_admin_ui_list_config_for_server',
+    'page arguments' => array(3),
+    'type' => MENU_LOCAL_TASK,
+  ) + $common;
+  $menu['admin/data/servers/%server_management/config/add'] = array(
+    'title' => 'Add Packet',
+    'type' => MENU_LOCAL_ACTION,
+    'page callback' => 'server_management_admin_ui_config_item_type_for_add',
+    'page arguments' => array(3),
+  ) + $common;
+  $menu['admin/data/servers/%server_management/config/add/%server_management_config_type'] = array(
+    'title' => 'Add Packet',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_admin_ui_config_item_form', 3, 6),
+  ) + $common;
+  $menu['admin/data/servers/%server_management/config/%server_management_config'] = array(
+    'title' => 'View Packet',
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'server_management_admin_ui_view_config_item',
+    'page arguments' => array(5,3),
+  ) + $common;
+  $menu['admin/data/servers/%server_management/config/%server_management_config/view'] = array(
+    'title' => 'View',
+    'type' => MENU_LOCAL_TASK & MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  ) + $common;
+  $menu['admin/data/servers/%server_management/config/%server_management_config/edit'] = array(
+    'title' => 'Edit',
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_admin_ui_config_item_form', 3, 5),
+  ) + $common;
+  $menu['admin/data/servers/%server_management/config/%server_management_config/delete'] = array(
+    'title' => 'Delete',
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_admin_ui_config_item_delete_form', 5),
+  ) + $common;
+  $menu['admin/data/servers/%server_management/delete'] = array(
+    'title' => 'Delete',
+    'description' => 'Delete a managed server',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_admin_ui_delete_form', 3),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 20,
+  ) + $common;
+  return $menu;
+}

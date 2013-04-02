@@ -1,0 +1,3 @@
+name = Server Management Admin UI
+description = "Provides administrative controls for server management"
+core = 7.x

@@ -1,0 +1,187 @@
+<?php
+
+function server_management_config_types() {
+  if (!db_table_exists('server_management_config_types')) {
+    return array();
+  }
+  $types = array();
+  $results = db_query('SELECT * FROM {server_management_config_types} ORDER BY `label`');
+  foreach ($results as $result) {
+    $types[$result->type] = $result;
+  }
+  return $types;
+}
+
+function server_management_config_type_name_exists($name) {
+  $existing = array_keys(server_management_config_types());
+  return in_array($name, $existing);
+}
+
+function server_management_entity_info() {
+  $bundles = array();
+  foreach (server_management_config_types() as $type) {
+    $bundles[$type->type] = array(
+      'label' => $type->label,
+      'admin' => array(
+        'path' => 'admin/structure/server_config/manage/%server_management_config_type',
+        'real path' => 'admin/structure/server_config/manage/' . $type->type,
+        'bundle argument' => 4,
+        'access arguments' => array('administer server fields'),
+      ),
+    );
+  }
+  return array(
+    'server_config' => array(
+      'label' => t('Server Configuration'),
+      'entity class' => 'Entity',
+      'controller class' => 'ServerConfigurationEntityController',
+      'base table' => 'server_management_config',
+      'load hook' => 'server_management_config_load',
+      'access callback' => 'server_management_config_access',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'cid',
+        'label' => 'label',
+        'bundle' => 'type',
+      ),
+      'bundles' => $bundles,
+    ),
+    'server' => array(
+      'label' => t('Server'),
+      'entity class' => 'Entity',
+      'controller class' => 'ServerEntityController',
+      'base table' => 'server_management_servers',
+      'load hook' => 'server_management_load',
+      'access callback' => 'server_management_access',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'sid',
+        'label' => 'label',
+      ),
+      'bundles' => array(
+        'server' => array(
+          'label' => 'Server',
+          'admin' => array(
+            'path' => 'admin/structure/servers/manage/server',
+            'access arguments' => array('administer server fields'),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+function server_management_theme() {
+  return array(
+    'server' => array(
+      'variables' => array(
+        'server' => NULL,
+        'view_mode' => 'full',
+      ),
+      'template' => 'server',
+    ),
+  );
+}
+
+function server_management_config_type_load($type) {
+  $types = server_management_config_types();
+  if (isset($types[$type])) {
+    return $type;
+  }
+  return FALSE;
+}
+
+function server_management_menu() {
+  $admin_common = array(
+    'file' => 'server_management.admin.inc',
+    'access arguments' => array('administer server fields'),
+  );
+  $menu = array();
+  $menu['admin/structure/servers'] = array(
+    'title' => 'Managed Servers',
+    'description' => 'Manage settings for managed servers',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_server_form'),
+  ) + $admin_common;
+  $menu['admin/structure/server_config'] = array(
+    'title' => 'Server Configuation Packets',
+    'description' => 'Manage the different types of information that we can store about servers',
+    'page callback' => 'server_management_config_list_types',
+    'type' => MENU_NORMAL_ITEM,
+  ) + $admin_common;
+  $menu['admin/structure/server_config/list'] = array(
+    'title' => 'List',
+    'weight' => -20,
+    'type' =>  MENU_DEFAULT_LOCAL_TASK & MENU_LOCAL_TASK,
+  ) + $admin_common;
+  $menu['admin/structure/server_config/add'] = array(
+    'title' => 'Add Configuration Bundle',
+    'type' => MENU_LOCAL_ACTION,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_config_type_form'),
+  ) + $admin_common;
+  $menu['admin/structure/server_config/manage/%server_management_config_type'] = array(
+    'title' => 'Edit Configuration Type',
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('server_management_config_type_form', 4),
+  ) + $admin_common;
+  $menu['admin/structure/server_config/manage/%server_management_config_type/edit'] = array(
+    'title' => 'Edit',
+    'type' => MENU_DEFAULT_LOCAL_TASK & MENU_LOCAL_TASK,
+    'weight' => -20,
+  ) + $admin_common;
+  return $menu;
+}
+
+function server_management_config_load($cid) {
+  $controller = entity_get_controller('server_config');
+  return reset($controller->load(array($cid)));
+}
+
+function server_management_name_exists($machine_name) {
+  $server = server_management_load_by_name($machine_name);
+  return !empty($server);
+}
+
+function server_management_save_server(&$server) {
+  $controller = entity_get_controller('server');
+  $controller->save($server);
+}
+
+function server_management_load($server_id) {
+  $controller = entity_get_controller('server');
+  return reset($controller->load(array($server_id)));
+}
+
+function server_management_load_by_name($server_name) {
+  $efq = new EntityFieldQuery();
+  $efq->entityCondition('entity_type', 'server');
+  $efq->propertyCondition('machine_name', $server_name);
+  $results = $efq->execute();
+  if (empty($results)) {
+    return FALSE;
+  }
+  return server_management_load(reset(array_keys($results['server'])));
+}
+
+function server_management_permission() {
+  return array(
+    'administer servers' => array(
+      'title' => t('Server Access'),
+      'description' => t('Allows user to administer server information'),
+    ),
+    'administer server fields' => array(
+      'title' => t('Field Access'),
+      'description' => t('Allows user to administer server fields'),
+    ),
+  );
+}
+
+function server_management_access() {
+  return user_access('administer servers');
+}
+
+function server_management_config_access() {
+  return user_access('administer servers');
+}
