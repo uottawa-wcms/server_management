@@ -54,6 +54,7 @@ function server_management_secsyn_entity_children($entity) {
     case 'server':
       $packets = server_management_config_item_load($entity->sid);
       foreach ($packets as $packet) {
+        $packet->entity_type = 'server_config';
         $deps[] = array(
           'object' => $packet,
           'profile' => 'SecureSyndicationEntityProfile',
@@ -76,16 +77,16 @@ switch ($entity->entity_type) {
 }
 
 function server_management_secsyn_entity_package_alter(&$package, $object) {
-  switch ($entity->entity_type) {
+  switch ($object->entity_type) {
     case 'server':
       if (!empty($object->parent_sid)) {
         $parent = server_management_load($object->parent_sid);
-        $package['parent_server'] = $parent->machine_name;
+        $package->parent_server = $parent->machine_name;
       }
       break;
     case 'server_config':
       $parent = server_management_load($object->sid);
-      $package['parent_server'] = $parent->machine_name;
+      $package->parent_server = $parent->machine_name;
       break;
   }
 }
@@ -221,7 +222,7 @@ function server_management_entity_info() {
 }
 
 function server_management_type_api_load() {
-  return array('server' => TRUE);
+  return (object) array('server' => TRUE);
 }
 
 function server_management_type_api_save() {
@@ -229,7 +230,11 @@ function server_management_type_api_save() {
 }
 
 function server_management_config_type_api_load($entity_type, $bundle_name) {
-  return server_management_config_type_load($bundle_name);
+  $types = server_management_config_types();
+  if (empty($types[$bundle_name])) {
+    return FALSE;
+  }
+  return $types[$bundle_name];
 }
 
 function server_management_config_type_api_save($bundle_def) {
@@ -240,7 +245,7 @@ function server_management_config_type_api_save($bundle_def) {
 
 function server_management_config_type_save($type) {
   return db_merge('server_management_config_types')
-      ->fields($type)
+      ->fields((array) $type)
       ->key(array('type' => $type['type']))
       ->execute();
 }
