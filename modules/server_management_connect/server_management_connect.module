@@ -1,0 +1,68 @@
+<?php
+
+define('SERVER_MANAGEMENT_CONNECT_TEST', 'test');
+define('SERVER_MANAGEMENT_CONNECT_ACTUAL', 'actual');
+define('SERVER_MANAGEMENT_CONNECT_FORCE', 'force');
+
+function server_management_connect_process($mode = SERVER_MANAGEMENT_CONNECT_TEST) {
+  $settings = variable_get('server_management_connect', array(
+    'central_link' => '',
+    'machine_name' => '',
+    'access_key' => '',
+    'delay' => 1800,
+    'enabled' => 0,
+    'last_executed' => 0,
+  ));
+  if (_server_management_connect_validate($settings, $mode)) {
+    
+  }
+}
+
+function _server_management_connect_validate($settings, $mode) {
+  $error = FALSE;
+  if (empty($settings['central_link'])) {
+    $error = 'No link to central provided.';
+  }
+  if (empty($settings['machine_name'])) {
+    $error = 'No machine name for this server provided.';
+  }
+  if (empty($settings['access_key'])) {
+    $error = 'No access key for this server provided.';
+  }
+  if ($mode != SERVER_MANAGEMENT_CONNECT_TEST) {
+    $error = 'Server connect is not enabled';
+  }
+  if ($error) {
+    if ($mode == SERVER_MANAGEMENT_CONNECT_ACTUAL) {
+      watchdog('server_management_connect', $error, array(), WATCHDOG_ERROR);
+    } else {
+      drupal_set_message(t($error), 'warning');
+    }
+    return FALSE;
+  }
+  return TRUE;
+}
+
+function server_management_connect_menu() {
+  return array(
+    'admin/config/system/server_connect' => array(
+      'title' => 'Server Connect',
+      'description' => 'Manage your connection to our central server',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('server_management_connect_config_form'),
+      'access arguments' => array('server management connect'),
+      'file' => 'server_management_connect.admin.inc',
+    ),
+  );
+}
+
+function server_management_connect_permission() {
+  return array(
+    'server management connect' => array(
+      'title' => t('Server Connect'),
+      'description' => t('Administer server connect'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+

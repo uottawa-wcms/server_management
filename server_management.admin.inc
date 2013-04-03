@@ -75,6 +75,7 @@ function server_management_config_type_form_submit($form, &$form_state) {
     'type' => $form_state['values']['type'],
     'cardinality' => $form_state['values']['cardinality'],
   );
+  server_management_config_type_save($type);
   db_merge('server_management_config_types')
       ->fields($type)
       ->key(array('type' => $type['type']))

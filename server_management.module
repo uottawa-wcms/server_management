@@ -1,5 +1,138 @@
 <?php
 
+function server_management_secsyn_entity_dependency($entity) {
+  $deps = array();
+  switch ($entity->entity_type) {
+    case 'server':
+      if (!empty($entity->parent_sid)) {
+        $server = server_management_load($entity->parent_sid);
+        $deps[] = array(
+          'object' => $server,
+          'profile' => 'SecureSyndicationEntityProfile',
+        );
+      }
+      break;
+    case 'server_config':
+      $server = server_management_load($entity->sid);
+      $deps[] = array(
+        'object' => $server,
+        'profile' => 'SecureSyndicationEntityProfile',
+      );
+      break;
+  }
+  return $deps;
+}
+
+function server_management_yamlconfig_handlers() {
+  return array(
+    'server_config_type' => array(
+      'weight' => 500,
+    ),
+  );
+}
+
+function server_management_config_type_delete($type) {
+  db_delete('server_management_config_types')
+      ->condition('type', $type)
+      ->execute();
+  field_attach_delete_bundle('server_config', $type);
+}
+
+function server_management_secsyn_entity_children($entity) {
+  $deps = array();
+  switch ($entity->entity_type) {
+    case 'server':
+      $packets = server_management_config_item_load($entity->sid);
+      foreach ($packets as $packet) {
+        $deps[] = array(
+          'object' => $packet,
+          'profile' => 'SecureSyndicationEntityProfile',
+        );
+      }
+      break;
+  }
+  return $deps;
+}
+
+function server_management_secsyn_entity_ignore_fields($entity) {
+switch ($entity->entity_type) {
+    case 'server':
+      return array('sid', 'parent_sid');
+      break;
+    case 'server_config':
+      return array('cid', 'sid');
+      break;
+  }
+}
+
+function server_management_secsyn_entity_package_alter(&$package, $object) {
+  switch ($entity->entity_type) {
+    case 'server':
+      if (!empty($object->parent_sid)) {
+        $parent = server_management_load($object->parent_sid);
+        $package['parent_server'] = $parent->machine_name;
+      }
+      break;
+    case 'server_config':
+      $parent = server_management_load($object->sid);
+      $package['parent_server'] = $parent->machine_name;
+      break;
+  }
+}
+
+function server_management_secsyn_entity_presave(&$entity) {
+  switch ($entity->entity_type) {
+    case 'server':
+      if (!empty($entity->parent_server)) {
+        $server = server_management_load_by_name($entity->parent_server);
+        $entity->parent_sid = $server->sid;
+        unset($entity->parent_server);
+      }
+      break;
+    case 'server_config':
+      $server = server_management_load_by_name($entity->parent_server);
+      $entity->sid = $server->sid;
+      unset($entity->parent_server);
+      break;
+  }
+}
+
+function server_management_server_load_by_parent($parent_sid = NULL) {
+  $efq = new EntityFieldquery();
+  $efq->entityCondition('entity_type', 'server');
+  if (empty($parent_sid)) {
+    $efq->propertyCondition('parent_sid', 1, '<');
+  } else {
+    $efq->propertycondition('parent_sid', $parent_sid);
+  }
+  $results = array();
+  $rs = $efq->execute();
+  if (empty($rs['server'])) {
+    return array();
+  }
+  foreach (array_keys($rs['server']) as $sid) {
+    $results[$sid] = server_management_load($sid);
+  }
+  return $results;
+}
+
+function server_management_delete_server($server) {
+  $controller = entity_get_controller('server');
+  $controller->delete(array($server->sid));
+}
+
+function server_management_delete_config($config) {
+  $controller = entity_get_controller('server_config');
+  $controller->delete(array($config->cid));
+}
+
+function server_management_config_item_load($server_id) {
+  $q = db_select('server_management_config', 'smc');
+  $q->fields('smc');
+  $q->condition('sid', $server_id);
+  return $q->execute()->fetchAll();
+}
+
 function server_management_config_types() {
   if (!db_table_exists('server_management_config_types')) {
     return array();
@@ -38,11 +171,14 @@ function server_management_entity_info() {
       'base table' => 'server_management_config',
       'load hook' => 'server_management_config_load',
       'access callback' => 'server_management_config_access',
+      'bundle_load' => 'server_management_config_type_api_load',
+      'bundle_save' => 'server_management_config_type_api_save',
       'fieldable' => TRUE,
       'entity keys' => array(
         'id' => 'cid',
         'label' => 'label',
         'bundle' => 'type',
+        'custom uuid' => 'uuid',
       ),
       'bundles' => $bundles,
     ),
@@ -53,10 +189,13 @@ function server_management_entity_info() {
       'base table' => 'server_management_servers',
       'load hook' => 'server_management_load',
       'access callback' => 'server_management_access',
+      'bundle load' => 'server_management_type_api_load',
+      'bundle save' => 'server_management_type_api_save',
       'fieldable' => TRUE,
       'entity keys' => array(
         'id' => 'sid',
         'label' => 'label',
+        'custom uuid' => 'machine_name',
       ),
       'bundles' => array(
         'server' => array(
@@ -69,6 +208,31 @@ function server_management_entity_info() {
       ),
     ),
   );
+}
+
+function server_management_type_api_load() {
+  return array('server' => TRUE);
+}
+
+function server_management_type_api_save() {
+  return TRUE;
+}
+
+function server_management_config_type_api_load($entity_type, $bundle_name) {
+  return server_management_config_type_load($bundle_name);
+}
+
+function server_management_config_type_api_save($bundle_def) {
+  unset($bundle_def['entity_type']);
+  unset($bundle_def['bundle_name']);
+  return server_management_config_type_save($bundle_def);
+}
+
+function server_management_config_type_save($type) {
+  return db_merge('server_management_config_types')
+      ->fields($type)
+      ->key(array('type' => $type['type']))
+      ->execute();
 }
 
 function server_management_theme() {

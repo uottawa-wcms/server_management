@@ -1,0 +1,9 @@
+name = Server Management Connect
+description = "Provides tools for connecting to a central server and copying
+your site's configuration variables, and managing them locally."
+core = 7.x
+
+dependencies[] = server_management
+dependencies[] = secsyn_entity
+
+

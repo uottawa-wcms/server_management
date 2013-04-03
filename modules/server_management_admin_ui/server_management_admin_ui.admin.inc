@@ -1,24 +1,5 @@
 <?php
 
-function server_management_admin_ui_server_load_by_parent($parent_sid = NULL) {
-  $efq = new EntityFieldquery();
-  $efq->entityCondition('entity_type', 'server');
-  if (empty($parent_sid)) {
-    $efq->propertyCondition('parent_sid', 1, '<');
-  } else {
-    $efq->propertycondition('parent_sid', $parent_sid);
-  }
-  $results = array();
-  $rs = $efq->execute();
-  if (empty($rs['server'])) {
-    return array();
-  }
-  foreach (array_keys($rs['server']) as $sid) {
-    $results[$sid] = server_management_load($sid);
-  }
-  return $results;
-}
-
 function _server_management_admin_ui_build_option_list() {
   $rs = db_query('SELECT sid, parent_sid, label FROM {server_management_servers} ORDER BY parent_sid ASC, label ASC');
   $basic_options = array();
@@ -33,7 +14,7 @@ function _server_management_admin_ui_build_option_list() {
   }
   $nested_options = array();
   if (!empty($basic_options[0])) {
-    $nested_options = _server_management_option_list_recurse($basic_options, 0, 0);
+    $nested_options = _server_management_admin_ui_option_list_recurse($basic_options, 0, 0);
   }
   return $nested_options;
 }
@@ -48,7 +29,7 @@ function _server_management_admin_ui_option_list_recurse(&$basic_options, $paren
   if (isset($basic_options[$parent_id])) {
     foreach ($basic_options[$parent_id] as $sid => $label) {
       $options[$sid] = $label_prefix . $label;
-      $options += _server_management_option_list_recurse($basic_options, $sid, $depth + 1);
+      $options += _server_management_admin_ui_option_list_recurse($basic_options, $sid, $depth + 1);
     }
   }
   return $options;
@@ -60,7 +41,7 @@ function server_management_admin_ui_server_list() {
     'state' => t('State'),
     'actions' => t('Actions'),
   );
-  $rows = _server_management_server_list();
+  $rows = _server_management_admin_ui_server_list();
   return theme('table', array(
     'rows' => $rows,
     'header' => $header,
@@ -72,8 +53,8 @@ function _server_management_admin_ui_server_list($parent = NULL, $depth = 0) {
   $rows = array();
   $servers = server_management_server_load_by_parent($parent);
   foreach ($servers as $server) {
-    $rows[$server->sid] = _server_management_create_row($server, $depth);
-    $rows += _server_management_server_list($server->sid, $depth + 1);
+    $rows[$server->sid] = _server_management_admin_ui_create_row($server, $depth);
+    $rows += _server_management_admin_ui_server_list($server->sid, $depth + 1);
   }
   return $rows;
 }
@@ -95,7 +76,17 @@ function _server_management_admin_ui_create_row($server, $depth = 0) {
 }
 
 function server_management_admin_ui_delete_form($form, &$form_state, $server) {
+  $form_state['server'] = $server;
+  return confirm_form($form,
+      t('Are you sure you want to delete this server?'),
+      'admin/data/servers/' . $server->sid,
+      NULL, t('Delete'));
+}
 
+function server_management_admin_ui_delete_form_submit($form, &$form_state) {
+  server_management_delete_server($form_state['server']);
+  drupal_set_message(t('Server deleted'));
+  $form_state['redirect'] = 'admin/data/servers';
 }
 
 function server_management_admin_ui_edit_form($form, &$form_state, $server = NULL) {
@@ -139,7 +130,7 @@ function server_management_admin_ui_edit_form($form, &$form_state, $server = NUL
     '#title' => t('Parent Server'),
     '#options' => array(
       0 => 'none',
-    ) + _server_management_build_option_list(),
+    ) + _server_management_admin_ui_build_option_list(),
     '#default_value' => $server->parent_sid,
   );
   $form['status'] = array(
@@ -180,18 +171,9 @@ function server_management_admin_ui_edit_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'admin/data/servers/' . $server->sid;
 }
 
-
-
 function server_management_admin_ui_view($server) {
   $controller = entity_get_controller('server');
   return $controller->view(array($server->sid => $server));
-}
-
-function server_management_admin_ui_config_item_load($server_id) {
-  $q = db_select('server_management_config', 'smc');
-  $q->fields('smc');
-  $q->condition('sid', $server_id);
-  return $q->execute()->fetchAll();
 }
 
 function server_management_admin_ui_list_config_for_server($server) {
@@ -289,8 +271,18 @@ function server_management_admin_ui_config_item_form_submit($form, &$form_state)
   $form_state['redirect'] = 'admin/data/servers/' . $object->sid;
 }
 
-function server_management_admin_ui_config_item_delete_form($form, $form_state, $item) {
+function server_management_admin_ui_config_item_delete_form($form, &$form_state, $item) {
+  $form_state['item'] = $item;
+  return confirm_form($form,
+      t('Are you sure you want to delete this configuration packet?'),
+      'admin/data/servers/' . $item->sid,
+      NULL, t('Delete'));
+}
 
+function server_management_admin_ui_config_item_delete_form_submit($form, &$form_state) {
+  server_management_delete_config($form_state['item']);
+  drupal_set_message(t('Configuration packet deleted'));
+  $form_state['redirect'] = 'admin/data/servers/' . $form_state['item']->sid;
 }
 
 function server_management_admin_ui_view_config_item($item) {
