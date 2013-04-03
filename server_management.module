@@ -1,5 +1,15 @@
 <?php
 
+function server_management_twoway_service() {
+  return array(
+    'server_connect' => array(
+      'callback' => 'server_management_service_do_server_connect',
+      'service_file' => 'services/server_management.server_connect.inc',
+      'description' => 'Requests that services be sent between the servers',
+    ),
+  );
+}
+
 function server_management_secsyn_entity_dependency($entity) {
   $deps = array();
   switch ($entity->entity_type) {

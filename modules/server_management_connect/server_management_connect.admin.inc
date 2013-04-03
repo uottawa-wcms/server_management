@@ -75,24 +75,33 @@ function server_management_connect_config_form_validate($form, &$form_state) {
 }
 
 function server_management_connect_config_form_save($form, &$form_state) {
+  $settings = variable_get('server_management_connect', array(
+    'central_link' => '',
+    'machine_name' => '',
+    'access_key' => '',
+    'delay' => 1800,
+    'enabled' => 0,
+    'last_executed' => 0,
+  ));
   $configuration = array(
     'central_link' => $form_state['values']['remote_server_link'],
     'machine_name' => $form_state['values']['server_machine_name'],
     'access_key' => $form_state['values']['server_access_key'],
     'delay' => $form_state['values']['server_connect_delay'],
     'enabled' => $form_state['values']['server_connect'],
+    'last_executed' => $settings['last_executed'],
   );
   variable_set('server_management_connect', $configuration);
   drupal_set_message(t('Server Connect settings saved'));
 }
 
 function server_management_connect_config_form_test($form, &$form_state) {
-  server_management_connect_config_form_save($form, &$form_state);
-  server_management_connect_process(SERVER_MANAGEMENT_CONNECT_TEST);
+  server_management_connect_config_form_save($form, $form_state);
+  _server_management_connect_process(SERVER_MANAGEMENT_CONNECT_TEST);
 }
 
 function server_management_connect_config_form_sync($form, &$form_state) {
-  server_management_connect_config_form_save($form, &$form_state);
-  server_management_connect_process(SERVER_MANAGEMENT_CONNECT_FORCE);
+  server_management_connect_config_form_save($form, $form_state);
+  _server_management_connect_process(SERVER_MANAGEMENT_CONNECT_FORCE);
 
 }

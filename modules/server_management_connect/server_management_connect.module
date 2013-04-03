@@ -4,7 +4,7 @@ define('SERVER_MANAGEMENT_CONNECT_TEST', 'test');
 define('SERVER_MANAGEMENT_CONNECT_ACTUAL', 'actual');
 define('SERVER_MANAGEMENT_CONNECT_FORCE', 'force');
 
-function server_management_connect_process($mode = SERVER_MANAGEMENT_CONNECT_TEST) {
+function _server_management_connect_process($mode = SERVER_MANAGEMENT_CONNECT_TEST) {
   $settings = variable_get('server_management_connect', array(
     'central_link' => '',
     'machine_name' => '',
@@ -14,8 +14,48 @@ function server_management_connect_process($mode = SERVER_MANAGEMENT_CONNECT_TES
     'last_executed' => 0,
   ));
   if (_server_management_connect_validate($settings, $mode)) {
-    
+    if ($mode == SERVER_MANAGEMENT_CONNECT_TEST) {
+      module_load_include('inc', 'twoway', 'services/twoway.enabled');
+      $results = twoway_invoke_enabled($settings['central_link']);
+      if ($results == 'success') {
+        drupal_set_message(t('Successfully connected to test server'));
+      } else {
+        if (!empty($results)) {
+          drupal_set_message(t($results), 'error');
+        } else {
+          drupal_set_message(t('Failed to connect to test server'), 'error');
+        }
+      }
+    } else {
+      if ($mode == SERVER_MANAGEMENT_CONNECT_FORCE ||
+          ($mode == SERVER_MANAGEMENT_CONNECT_ACTUAL &&
+          (time() < ($settings['last_executed'] + $settings['delay'])))) {
+        if (_server_management_request_server_variables($settings)) {
+          $message = 'Server configurations requested';
+        } else {
+          $message = 'Server configuration request failed';
+        }
+        if ($mode == SERVER_MANAGEMENT_CONNECT_FORCE) {
+          drupal_set_message(t($message));
+        } else {
+          watchdog('server_management_connect', $message, array(), WATCHDOG_DEBUG);
+        }
+      }
+    }
   }
+}
+
+function _server_management_request_server_variables($settings) {
+  module_load_include('inc', 'server_management', 'services/server_management.server_connect');
+  $results = server_management_service_invoke_server_connect(
+      $settings['central_link'],
+      $settings['machine_name'],
+      $settings['access_key']);
+  if ($results) {
+    $settings['last_executed'] = time();
+    variable_set('server_management_connect', $settings);
+  }
+  return $results;
 }
 
 function _server_management_connect_validate($settings, $mode) {
@@ -30,7 +70,9 @@ function _server_management_connect_validate($settings, $mode) {
     $error = 'No access key for this server provided.';
   }
   if ($mode != SERVER_MANAGEMENT_CONNECT_TEST) {
-    $error = 'Server connect is not enabled';
+    if (empty($settings['enabled'])) {
+      $error = 'Server connect is not enabled';
+    }
   }
   if ($error) {
     if ($mode == SERVER_MANAGEMENT_CONNECT_ACTUAL) {

@@ -1,6 +1,6 @@
 <?php
   if (!empty($server->label)) {
-    print '<h1>' . $server->label . '</h1>';
+    print '<h1 title="'.check_plain($server->machine_name).'">' . $server->label . '</h1>';
   }
   print '<p class="parent_server">';
   if (!empty($server->parent_sid)) {
