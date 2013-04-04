@@ -234,7 +234,7 @@ function server_management_config_type_api_load($entity_type, $bundle_name) {
   if (empty($types[$bundle_name])) {
     return FALSE;
   }
-  return $types[$bundle_name];
+  return (array) $types[$bundle_name];
 }
 
 function server_management_config_type_api_save($bundle_def) {

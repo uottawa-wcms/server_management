@@ -4,6 +4,44 @@ define('SERVER_MANAGEMENT_CONNECT_TEST', 'test');
 define('SERVER_MANAGEMENT_CONNECT_ACTUAL', 'actual');
 define('SERVER_MANAGEMENT_CONNECT_FORCE', 'force');
 
+function _server_management_connect_config($type = NULL) {
+  $settings = variable_get('server_management_connect', array(
+    'central_link' => '',
+    'machine_name' => '',
+    'access_key' => '',
+    'delay' => 1800,
+    'enabled' => 0,
+    'last_executed' => 0,
+  ));
+  if (empty($settings['machine_name'])) {
+    return array();
+  }
+  $server = server_management_load_by_name($settings['machine_name']);
+  if (empty($server)) {
+    return array();
+  }
+  return _server_management_connect_find_config($server, $type);
+}
+
+function _server_management_connect_find_config($server, $type = NULL, $parent = FALSE) {
+  $config = array();
+  $objects = server_management_config_item_load($server->sid);
+  foreach ($objects as $conf) {
+    // we want all items from this level, plus all items from parents with the
+    // inherit status set to true
+    if ((!$parent) || ($conf->inherit)) {
+      // if we gave a type, we only want items of that type.
+      if (empty($type) || ($type == $conf->type)) {
+        $config[$conf->cid] = $conf;
+      }
+    }
+  }
+  if (!empty($server->parent_sid)) {
+    _server_management_connect_find_config(server_management_load($server->parent_sid), $type, TRUE);
+  }
+  return $config;
+}
+
 function _server_management_connect_process($mode = SERVER_MANAGEMENT_CONNECT_TEST) {
   $settings = variable_get('server_management_connect', array(
     'central_link' => '',
