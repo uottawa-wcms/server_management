@@ -240,10 +240,10 @@ function server_management_config_type_api_load($entity_type, $bundle_name) {
 }
 
 function server_management_config_type_api_save($bundle_def) {
-  $bundle_def = (array) $bundle_def;
-  unset($bundle_def['entity_type']);
-  unset($bundle_def['bundle_key']);
-  return server_management_config_type_save($bundle_def);
+  return server_management_config_type_save(array(
+    'type' => $bundle_def->type,
+    'label' => $bundle_def->label
+  ));
 }
 
 function server_management_config_type_save($type) {
