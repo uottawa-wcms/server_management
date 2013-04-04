@@ -26,7 +26,9 @@
   print render($content);
 
   print '<h2>' . t('Managed Configuration') . '</h2>';
-  print l('+ Add Configuration', 'admin/data/servers/' . $server->sid . '/config/add');
+  if (server_management_access('add config', $server)) {
+    print l('+ Add Configuration', 'admin/data/servers/' . $server->sid . '/config/add');
+  }
 
   $packets = server_management_config_item_load($server->sid);
   $header = array(
@@ -36,14 +38,22 @@
   );
   $rows = array();
   foreach ($packets as $packet) {
-    $rows[] = array(
-      'label' => l($packet->label, 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid),
-      'type' => $packet->type,
-      'actions' => implode(' ', array(
-        l(t('edit'), 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid . '/edit'),
-        l(t('delete'), 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid . '/delete'),
-      )),
-    );
+    if (server_management_config_access('view', $packet)) {
+      $rows[] = array(
+        'label' => l($packet->label, 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid),
+        'type' => $packet->type,
+        'actions' => implode(' ', array(
+          l(t('edit'), 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid . '/edit'),
+          l(t('delete'), 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid . '/delete'),
+        )),
+      );
+    } else {
+      $rows[] = array(
+        'label' => $packet->label,
+        'type' => $packet->type,
+        'actions' => t('Locked'),
+      );
+    }
   }
   print theme('table', array(
     'header' => $header,

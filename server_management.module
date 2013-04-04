@@ -271,9 +271,9 @@ function server_management_config_type_load($type) {
 }
 
 function server_management_menu() {
-  $admin_common = array(
+  $admin_config_common = array(
     'file' => 'server_management.admin.inc',
-    'access arguments' => array('administer server fields'),
+    'access arguments' => array('manage configuration types and fields'),
   );
   $menu = array();
   $menu['admin/structure/servers'] = array(
@@ -281,35 +281,37 @@ function server_management_menu() {
     'description' => 'Manage settings for managed servers',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('server_management_server_form'),
-  ) + $admin_common;
+    'file' => 'server_management.admin.inc',
+    'access arguments' => array('manage server fields'),
+  );
   $menu['admin/structure/server_config'] = array(
     'title' => 'Server Configuation Packets',
     'description' => 'Manage the different types of information that we can store about servers',
     'page callback' => 'server_management_config_list_types',
     'type' => MENU_NORMAL_ITEM,
-  ) + $admin_common;
+  ) + $admin_config_common;
   $menu['admin/structure/server_config/list'] = array(
     'title' => 'List',
     'weight' => -20,
     'type' =>  MENU_DEFAULT_LOCAL_TASK & MENU_LOCAL_TASK,
-  ) + $admin_common;
+  ) + $admin_config_common;
   $menu['admin/structure/server_config/add'] = array(
     'title' => 'Add Configuration Bundle',
     'type' => MENU_LOCAL_ACTION,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('server_management_config_type_form'),
-  ) + $admin_common;
+  ) + $admin_config_common;
   $menu['admin/structure/server_config/manage/%server_management_config_type'] = array(
     'title' => 'Edit Configuration Type',
     'type' => MENU_NORMAL_ITEM,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('server_management_config_type_form', 4),
-  ) + $admin_common;
+  ) + $admin_config_common;
   $menu['admin/structure/server_config/manage/%server_management_config_type/edit'] = array(
     'title' => 'Edit',
     'type' => MENU_DEFAULT_LOCAL_TASK & MENU_LOCAL_TASK,
     'weight' => -20,
-  ) + $admin_common;
+  ) + $admin_config_common;
   return $menu;
 }
 
@@ -346,21 +348,125 @@ function server_management_load_by_name($server_name) {
 
 function server_management_permission() {
   return array(
-    'administer servers' => array(
-      'title' => t('Server Access'),
-      'description' => t('Allows user to administer server information'),
+    'manage all sites' => array(
+      'title' => t('Manage all sites'),
+      'description' => t('Allows user to administer server information for ALL servers.'),
+      'restrict access' => TRUE,
     ),
-    'administer server fields' => array(
-      'title' => t('Field Access'),
-      'description' => t('Allows user to administer server fields'),
+    'manage local site' => array(
+      'title' => t('Manage local site'),
+      'description' => t('Allows user to administer server information for this server.'),
+    ),
+    'manage sub-sites' => array(
+      'title' => t('Manage sub-sites'),
+      'description' => t('Allows user to admininster server information for sub-sites.'),
+    ),
+    'manage all configuration' => array(
+      'title' => t('Manage global configuration'),
+      'description' => t('Allows the user to manage configuration information for ALL servers.'),
+      'restrict access' => TRUE,
+    ),
+    'manage local configuration' => array(
+      'title' => t('Manage local configuration'),
+      'description' => t('Allows the user to manage configuration information for this server.'),
+    ),
+    'manage sub-site configuration' => array(
+      'title' => t('Manage sub-site configuration'),
+      'description' => t('Allows the user to manage configuration information for sub-sites.'),
+    ),
+    'manage configuration of any type' => array(
+      'title' => t('Manage configuration of any type'),
+      'description' => t('Allows the user to manage configuration information of any sub-type'),
+    ),
+    'manage server fields' => array(
+      'title' => t('Manage Server Entity'),
+      'description' => t('Allows the user control over the server fields.'),
+      'restrict access' => TRUE,
+    ),
+    'manage configuration types and fields' => array(
+      'title' => t('Manage Configuration Entity'),
+      'description' => t('Allows the user to create new config types and manage their fields'),
     ),
   );
 }
 
-function server_management_access() {
-  return user_access('administer servers');
+function server_management_list_access() {
+  return user_access('manage all sites') || user_access('manage local site') ||
+      user_access('manage sub-sites');
 }
 
-function server_management_config_access() {
-  return user_access('administer servers');
+function server_management_access($op, $server, $config_type = NULL) {
+  if (in_array($op, array('view config', 'add config', 'add config type'))) {
+    if (!server_management_config_site_access($server)) {
+      return FALSE;
+    }
+    if ($op == 'add config type') {
+      $obj = (object) array('type' => $config_type);
+      if (!server_management_config_type_access($obj)) {
+        return FALSE;
+      }
+    }
+  }
+  if (user_access('manage all sites')) {
+    return TRUE;
+  }
+  $settings = variable_get('server_management_connect');
+  if (!empty($settings['machine_name'])) {
+    if ($settings['machine_name'] == $server->machine_name) {
+      return user_access('manage local site');
+    }
+    if (user_access('manage sub-sites')) {
+      if (!empty($server->parent_sid)) {
+        return _server_management_subsite_access_check(
+            server_management_load($server->parent_sid),
+            $settings['machine_name']);
+      }
+    }
+  }
+  return FALSE;
+}
+
+function _server_management_subsite_access_check($server, $local_name) {
+  if ($server->machine_name == $local_name) {
+    return TRUE;
+  } elseif (empty($server->parent_sid)) {
+    return FALSE;
+  } else {
+    return _server_management_subsite_access_check(server_management_load($server->parent_sid), $local_name);
+  }
+}
+
+function server_management_config_access($op, $config) {
+  return server_management_config_site_access(server_management_load($config->sid)) &&
+      server_management_config_type_access($config);
+}
+
+function server_management_config_type_access($config) {
+  if (user_access('manage configuration of any type')) {
+    return TRUE;
+  }
+  $perm = 'manage configuration of type ' . $config->type;
+  if (user_access($perm)) {
+    return TRUE;
+  }
+}
+
+function server_management_config_site_access($server) {
+  if (user_access('manage all configuration')) {
+    return TRUE;
+  }
+  $settings = variable_get('server_management_connect');
+  if (!empty($settings['machine_name'])) {
+    if ($settings['machine_name'] == $server->machine_name) {
+      return user_access('manage local configuration');
+    }
+    if (user_access('manage sub-site configuration')) {
+      if (!empty($server->parent_sid)) {
+        return _server_management_subsite_access_check(
+            server_management_load($server->parent_sid),
+            $settings['machine_name']);
+      }
+    }
+  }
+  return FALSE;
 }

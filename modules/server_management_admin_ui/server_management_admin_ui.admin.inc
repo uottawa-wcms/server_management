@@ -1,16 +1,23 @@
 <?php
 
 function _server_management_admin_ui_build_option_list() {
-  $rs = db_query('SELECT sid, parent_sid, label FROM {server_management_servers} ORDER BY parent_sid ASC, label ASC');
+  $rs = db_query('SELECT * FROM {server_management_servers} ORDER BY parent_sid ASC, label ASC');
   $basic_options = array();
   foreach ($rs as $row) {
-    if (empty($row->parent_sid)) {
-      $row->parent_sid = 0;
+    if (server_management_access('edit', $row)) {
+      if (!empty($row->parent_sid)) {
+        $parent = server_management_load($row->parent_sid);
+        if (!server_management_access('edit', $parent)) {
+          $row->parent_sid = 0;
+        }
+      } else {
+        $row->parent_sid = 0;
+      }
+      if (empty($basic_options[$row->parent_sid])) {
+        $basic_options[$row->parent_sid] = array();
+      }
+      $basic_options[$row->parent_sid][$row->sid] = $row->label;
     }
-    if (empty($basic_options[$row->parent_sid])) {
-      $basic_options[$row->parent_sid] = array();
-    }
-    $basic_options[$row->parent_sid][$row->sid] = $row->label;
   }
   $nested_options = array();
   if (!empty($basic_options[0])) {
@@ -64,15 +71,23 @@ function _server_management_admin_ui_create_row($server, $depth = 0) {
   for ($k = 0; $k < $depth; $k++) {
     $margin += 15;
   }
-  return array(
-    'label' => '<span style="padding-left: ' . $margin . 'px">' .
-        l($server->label, 'admin/data/servers/' . $server->sid) . '</span>',
-    'state' => $server->status ? t('Active') : t('Disabled'),
-    'actions' => implode(' ', array(
-      l('edit', 'admin/data/servers/' . $server->sid . '/edit'),
-      l('delete', 'admin/data/servers/' . $server->sid . '/delete'),
-    )),
-  );
+  if (server_management_access($server)) {
+    return array(
+      'label' => '<span style="padding-left: ' . $margin . 'px">' .
+          l($server->label, 'admin/data/servers/' . $server->sid) . '</span>',
+      'state' => $server->status ? t('Active') : t('Disabled'),
+      'actions' => implode(' ', array(
+        l('edit', 'admin/data/servers/' . $server->sid . '/edit'),
+        l('delete', 'admin/data/servers/' . $server->sid . '/delete'),
+      )),
+    );
+  } else {
+    return array(
+      'label' => '<span style="padding-left: ' . $margin . 'px">' .
+          $server->label . '</span>',
+      'state' => t('Locked'),
+    );
+  }
 }
 
 function server_management_admin_ui_delete_form($form, &$form_state, $server) {
@@ -125,6 +140,18 @@ function server_management_admin_ui_edit_form($form, &$form_state, $server = NUL
     '#description' => t('Access key for the server to load its own profile data. Leaving this blank will automatically generate a new one.'),
     '#default_value' => $server->access_key,
   );
+  $locked = FALSE;
+  if (!user_access('manage all sites')) {
+    if (!empty($server->machine_name)) {
+      $locked = TRUE;
+      if (!empty($server->parent_sid)) {
+        $parent = server_management_load($server->parent_sid);
+        if (server_management_access('edit', $parent)) {
+          $locked = FALSE;
+        }
+      }
+    }
+  }
   $form['parent_sid'] = array(
     '#type' => 'select',
     '#title' => t('Parent Server'),
@@ -132,6 +159,7 @@ function server_management_admin_ui_edit_form($form, &$form_state, $server = NUL
       0 => 'none',
     ) + _server_management_admin_ui_build_option_list(),
     '#default_value' => $server->parent_sid,
+    '#access' => !$locked,
   );
   $form['status'] = array(
     '#type' => 'select',
@@ -185,14 +213,22 @@ function server_management_admin_ui_list_config_for_server($server) {
   );
   $rows = array();
   foreach ($packets as $packet) {
-    $rows[] = array(
-      'label' => l($packet->label, 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid),
-      'type' => $packet->type,
-      'actions' => implode(' ', array(
-        l(t('edit'), 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid . '/edit'),
-        l(t('delete'), 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid . '/delete'),
-      )),
-    );
+    if (server_management_config_access('view', $packet)) {
+      $rows[] = array(
+        'label' => l($packet->label, 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid),
+        'type' => $packet->type,
+        'actions' => implode(' ', array(
+          l(t('edit'), 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid . '/edit'),
+          l(t('delete'), 'admin/data/servers/' . $server->sid . '/config/' . $packet->cid . '/delete'),
+        )),
+      );
+    } else {
+      $rows[] = array(
+        'label' => $packet->label,
+        'type' => $packet->type,
+        'actions' => t('Locked'),
+      );
+    }
   }
   return theme('table', array(
     'header' => $header,
@@ -206,17 +242,19 @@ function server_management_admin_ui_config_item_type_for_add($server) {
   $content = array();
   foreach ($types as $type) {
     // @todo check $server to see if it's met it's cardinality limit for $type
-    $content[] = array(
-      'title' => $type->label,
-      'href' => 'admin/data/servers/' . $server->sid . '/config/add/' . $type->type,
-      'description' => !empty($type->description) ? $type->description : '',
-      'localized_options' => array(),
-    );
+    if (server_management_config_type_access((object) array('type' => $type))) {
+      $content[] = array(
+        'title' => $type->label,
+        'href' => 'admin/data/servers/' . $server->sid . '/config/add/' . $type->type,
+        'description' => !empty($type->description) ? $type->description : '',
+        'localized_options' => array(),
+      );
+    }
   }
   if (count($content)) {
     return theme('admin_block_content', array('content' => $content));
   } else {
-    return '<p>' . t('There are no server configuration packet types yet.') . '</p>';
+    return '<p>' . t('There are no server configuration packet types available.') . '</p>';
   }
 }
 
